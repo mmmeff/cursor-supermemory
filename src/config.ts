@@ -3,6 +3,19 @@ import os from "node:os";
 import fs from "node:fs";
 import { loadCredentials } from "./auth.ts";
 
+export const GLOBAL_CONFIG_PATH = path.join(os.homedir(), ".config", "cursor", "supermemory.json");
+
+export function getProjectConfigPath(cwd: string): string {
+  return path.join(cwd, ".cursor", ".supermemory", "config.json");
+}
+
+export function writeConfig(updates: Partial<Omit<Config, "apiKey">>, scope: "project" | "global", cwd = process.cwd()): void {
+  const filePath = scope === "project" ? getProjectConfigPath(cwd) : GLOBAL_CONFIG_PATH;
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const existing = readJson(filePath) ?? {};
+  fs.writeFileSync(filePath, JSON.stringify({ ...existing, ...updates }, null, 2));
+}
+
 export interface Config {
   apiKey: string | null;
   similarityThreshold: number;
@@ -47,7 +60,7 @@ function findProjectConfig(cwd: string): Record<string, any> | null {
 
 export function loadConfig(cwd?: string): Config {
   const projectConfig = findProjectConfig(cwd || process.cwd());
-  const globalConfig = readJson(path.join(os.homedir(), ".config", "cursor", "supermemory.json"));
+  const globalConfig = readJson(GLOBAL_CONFIG_PATH);
 
   const merged: Record<string, any> = { ...DEFAULTS, ...globalConfig, ...projectConfig };
 
