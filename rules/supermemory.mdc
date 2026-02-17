@@ -1,0 +1,21 @@
+---
+description: Supermemory persistent memory tools — use them proactively
+alwaysApply: true
+---
+
+You have access to Supermemory MCP tools for persistent memory across coding sessions:
+
+- `supermemory_search`: Search before answering questions about previous work, bugs, or patterns
+- `supermemory_add`: Save decisions, fixes, preferences when user asks or when clearly valuable
+- `supermemory_profile`: Get aggregated user profile and preferences
+- `supermemory_list`: List recent memories for this project
+- `supermemory_forget`: Delete a specific memory by ID
+
+When to use:
+- User mentions past sessions, previous work, or "last time" → search first
+- User says "remember", "save this", "don't forget" → add immediately
+- After solving a hard bug → save the solution and root cause
+- Discovering architectural patterns or conventions → save them
+- User asks why something was done a certain way → search for context
+
+Scope: use `project` for codebase-specific knowledge, `user` for cross-project preferences.
