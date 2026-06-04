@@ -15,7 +15,7 @@ Create or edit `.cursor/.supermemory/config.json` at your project root:
 
 Settings:
 - `apiKey`: Override the global API key for this project
-- `projectContainerTag`: Custom tag for project memories (default: auto-generated from git root)
+- `projectContainerTag`: Custom tag for project memories (default: auto-generated from git root). Commit this when a team should share one project memory bucket.
 - `userContainerTag`: Custom tag for user memories (default: auto-generated from email/machine)
 
-Add `.cursor/.supermemory/` to your `.gitignore` to keep credentials out of version control.
+Do not commit `apiKey`. If the config only contains a shared `projectContainerTag` and non-secret defaults, it is safe to commit.

@@ -111,10 +111,13 @@ function parseSections(text: string): { projectNotes: string[]; userNotes: strin
       current = "user";
       continue;
     }
-    if (line.toUpperCase() === NONE) continue;
 
+    // Strip the bullet prefix BEFORE checking sentinels — the model often emits
+    // the empty marker as a bullet ("- NONE"), which must not become a note.
     const bullet = line.replace(/^[-*•]\s*/, "").trim();
     if (!bullet) continue;
+    if (bullet.toUpperCase() === NONE) continue;
+
     if (current === "project") projectNotes.push(bullet);
     else if (current === "user") userNotes.push(bullet);
   }
@@ -198,4 +201,43 @@ export async function distillTranscript(
 export function formatNotesForStorage(notes: string[], scope: "project" | "user"): string {
   const heading = scope === "project" ? "Project learnings" : "User learnings";
   return `${heading} (distilled from a Cursor session):\n${notes.map((n) => `- ${n}`).join("\n")}`;
+}
+
+import { createClient } from "./client.ts";
+
+/**
+ * Distill a transcript string and persist the resulting notes to the
+ * project/user containers. Shared by the stop / preCompact / sessionEnd hooks
+ * for incremental capture. No-op (returns false) if there's nothing to capture
+ * or inference is unavailable; never stores raw transcripts.
+ */
+export async function distillAndStore(
+  transcript: string,
+  opts: { apiKey: string; projectTag: string; userTag: string },
+): Promise<boolean> {
+  if (!transcript.trim()) return false;
+
+  const notes = await distillTranscript(transcript);
+  if (!notes) return false;
+
+  const writes: Promise<unknown>[] = [];
+  if (notes.projectNotes.length) {
+    writes.push(
+      createClient(opts.apiKey, opts.projectTag).add({
+        content: formatNotesForStorage(notes.projectNotes, "project"),
+        containerTag: opts.projectTag,
+      }),
+    );
+  }
+  if (notes.userNotes.length) {
+    writes.push(
+      createClient(opts.apiKey, opts.userTag).add({
+        content: formatNotesForStorage(notes.userNotes, "user"),
+        containerTag: opts.userTag,
+      }),
+    );
+  }
+  if (!writes.length) return false;
+  await Promise.allSettled(writes);
+  return true;
 }

@@ -1,122 +1,61 @@
 import { loadCredentials } from "../auth.ts";
 import { loadConfig, getApiKey } from "../config.ts";
 import { getUserTag, getProjectTag } from "../tags.ts";
-import { createClient } from "../client.ts";
-import { distillTranscript, formatNotesForStorage } from "../distill.ts";
+import { distillAndStore } from "../distill.ts";
+import { readExchanges } from "../transcript.ts";
+import { loadSession, clearSession, bufferToTranscript } from "../sessionStore.ts";
 
 interface SessionEndInput {
-  session_id: string;
+  session_id?: string;
+  conversation_id?: string;
   transcript_path?: string;
   reason?: string;
   workspace_roots?: string[];
-}
-
-interface Turn {
-  role: string;
-  content?: unknown;
-  message?: unknown;
-}
-
-// Cursor transcripts store each turn as { role, message: { content: [{ type, text }] } }.
-// Older/other formats may use a flat string `content`. Extract plain text from either.
-function extractTurnText(turn: Turn): string {
-  if (typeof turn.content === "string") return turn.content;
-
-  const message = turn.message as { content?: unknown } | undefined;
-  const blocks = message?.content;
-  if (Array.isArray(blocks)) {
-    return blocks
-      .filter(
-        (b): b is { type: string; text: string } =>
-          !!b && typeof b === "object" && (b as { type?: unknown }).type === "text" &&
-          typeof (b as { text?: unknown }).text === "string",
-      )
-      .map((b) => b.text)
-      .join("\n");
-  }
-  return "";
-}
-
-function parseTranscript(text: string): Turn[] {
-  try {
-    const parsed = JSON.parse(text);
-    if (Array.isArray(parsed)) return parsed;
-  } catch {}
-
-  // Try JSONL
-  return text
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      try { return JSON.parse(line); } catch { return null; }
-    })
-    .filter(Boolean);
 }
 
 async function main() {
   const raw = await Bun.stdin.text();
   const input: SessionEndInput = JSON.parse(raw);
 
-  // Persist on any normal session end that produced a transcript. Cursor sends
-  // "completed" only rarely; real interactive sessions usually end with
-  // "user_close"/"window_close". Skip only sessions with no transcript or that
-  // ended abnormally ("aborted"/"error").
+  // Persist on any normal session end. Skip abnormal terminations.
   const NON_PERSISTABLE_REASONS = new Set(["aborted", "error"]);
-  if (!input.transcript_path || NON_PERSISTABLE_REASONS.has(input.reason ?? "")) return;
+  if (NON_PERSISTABLE_REASONS.has(input.reason ?? "")) return;
+
+  const conversationId = input.conversation_id ?? input.session_id ?? "";
 
   const creds = loadCredentials();
   if (!creds) return;
 
-  // Cursor spawns this hook from ~/.cursor, so process.cwd() is NOT the
-  // workspace. Resolve config + project tag from workspace_roots[0] (as
-  // session-start does) so reads and writes target the same container.
   const workspaceRoot = input.workspace_roots?.[0] || process.cwd();
   const config = loadConfig(workspaceRoot);
   const apiKey = getApiKey(config);
-  if (!apiKey) return;
-
-  const fileContent = await Bun.file(input.transcript_path).text();
-  const turns = parseTranscript(fileContent);
-
-  const relevant = turns
-    .filter((t) => t.role === "user" || t.role === "assistant")
-    .map((t) => ({ role: t.role, text: extractTurnText(t) }))
-    .filter((t) => t.text.length > 0);
-  const userTurns = relevant.filter((t) => t.role === "user");
-  if (userTurns.length < 2) return;
-
-  const transcript = relevant
-    .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.text}`)
-    .join("\n");
-
-  // Distill the transcript into condensed project/user learnings via the local
-  // Cursor Agent CLI rather than shipping the whole transcript. If inference is
-  // unavailable (CLI missing / not authenticated), distillTranscript returns
-  // null and we skip persistence — we never fall back to storing raw transcripts.
-  const notes = await distillTranscript(transcript);
-  if (!notes) return;
-
-  const userTag = getUserTag(config);
-  const projectTag = getProjectTag(workspaceRoot, config);
-
-  const writes: Promise<unknown>[] = [];
-  if (notes.projectNotes.length) {
-    writes.push(
-      createClient(apiKey, projectTag).add({
-        content: formatNotesForStorage(notes.projectNotes, "project"),
-        containerTag: projectTag,
-      }),
-    );
+  if (!apiKey) {
+    clearSession(conversationId);
+    return;
   }
-  if (notes.userNotes.length) {
-    writes.push(
-      createClient(apiKey, userTag).add({
-        content: formatNotesForStorage(notes.userNotes, "user"),
-        containerTag: userTag,
-      }),
-    );
+
+  // Final sweep: distill whatever incremental capture left in the buffer. If
+  // nothing was buffered (capture hooks never fired this session), fall back to
+  // the full transcript so we still capture the session.
+  const session = loadSession(conversationId);
+  let transcript = bufferToTranscript(session.buffer);
+  if (!transcript && input.transcript_path) {
+    const exchanges = await readExchanges(input.transcript_path);
+    const userTurns = exchanges.filter((e) => e.role === "user");
+    if (userTurns.length >= 2) {
+      transcript = exchanges.map((e) => `${e.role === "user" ? "User" : "Assistant"}: ${e.text}`).join("\n");
+    }
   }
-  if (writes.length) await Promise.allSettled(writes);
+
+  if (transcript) {
+    await distillAndStore(transcript, {
+      apiKey,
+      projectTag: getProjectTag(workspaceRoot, config),
+      userTag: getUserTag(config),
+    });
+  }
+
+  clearSession(conversationId);
 }
 
 main().catch((err) => {

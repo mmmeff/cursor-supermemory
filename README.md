@@ -12,9 +12,40 @@ bunx cursor-supermemory@latest login
 
 ## What it does
 
-- **Session hooks** — injects relevant memories at session start; saves conversation highlights at session end
+- **Active memory hooks** — recalls relevant context as you work and captures distilled learnings automatically
+- **Distilled capture** — extracts concise project/user learnings instead of uploading raw chat transcripts
 - **MCP tools** — available in every Cursor AI session for explicit memory control
 - **Always-on rule** — reminds the AI to use memory tools proactively
+
+## Automatic memory
+
+The plugin uses Cursor hooks to keep memory useful without manual prompts:
+
+| Hook | Behavior |
+|---|---|
+| `sessionStart` | Injects ambient context: your user profile plus the most recent project notes |
+| `beforeSubmitPrompt` | Searches project memory with the current prompt and stages relevant recall |
+| `postToolUse` | Injects staged recall once per turn via `additional_context` |
+| `stop` | Buffers completed turns and distills them every 3 turns |
+| `preCompact` | Flushes buffered turns before Cursor compacts context |
+| `sessionEnd` | Final sweep for any buffered turns |
+
+Automatic capture does **not** store full transcripts. It runs a local Cursor Agent CLI completion (`composer-2.5`) to extract:
+
+- **Project learnings** — durable codebase facts, conventions, architecture decisions, commands, gotchas, and bug root causes
+- **User learnings** — durable personal preferences and cross-project workflow facts
+
+Project learnings are saved to the project container; user learnings are saved to the user container. If the Cursor Agent CLI is missing, not authenticated, or fails, automatic capture skips persistence rather than falling back to raw transcript storage.
+
+### Cursor Agent CLI requirement
+
+Distilled automatic capture uses the local Cursor Agent CLI (`agent`) so it can reuse your existing Cursor login without requiring a separate model API key.
+
+```bash
+agent status
+```
+
+If `agent` is not installed or authenticated, install/login with Cursor's CLI flow, then restart or reload Cursor. MCP tools still work without the Agent CLI; only automatic distilled capture depends on it.
 
 ## MCP Tools
 
@@ -79,7 +110,7 @@ Per-workspace overrides. Add to `.gitignore` if it contains an API key. Project 
 |---|---|---|
 | `apiKey` | Project-specific API key | — |
 | `userContainerTag` | Override personal memory container | auto-derived from git email / machine id |
-| `projectContainerTag` | Override project memory container | auto-derived from git root / cwd |
+| `projectContainerTag` | Override project memory container. Commit this when your team should share one project memory bucket. | auto-derived from git root / cwd |
 | `similarityThreshold` | Minimum similarity score for search results | `0.3` |
 | `maxMemories` | Max project memories injected at session start | `10` |
 | `maxProjectMemories` | Max project memories injected at session start | `5` |
@@ -92,9 +123,9 @@ You can set these via the AI using `supermemory_set_config`, or create/edit the 
 By default, container tags are derived automatically:
 
 - **User tag** — hashed from your git email, `CURSOR_USER_EMAIL`, or machine id. Consistent across projects.
-- **Project tag** — hashed from your git repo root (or cwd). Consistent across team members on the same repo.
+- **Project tag** — hashed from your git repo root (or cwd). Stable for one checkout, but absolute paths can differ across teammates.
 
-To share project memory with your team, set the same `projectContainerTag` in everyone's project config.
+To share project memory with your team, commit the same `projectContainerTag` in project config. Do not commit `apiKey`; each developer's API key should stay local.
 
 ## Development
 
@@ -112,3 +143,5 @@ bun run build   # compiles all dist/ files
 5. **Restart Cursor** after changing `.cursor/mcp.json`.
 
 To test in a different project, add the `supermemory` entry from `.cursor/mcp.json` to that project's MCP config with an absolute path to `dist/mcp-server.js`.
+
+For local hook testing outside the marketplace, Cursor may need explicit user-level hook registration. Add the built hook commands to `~/.cursor/hooks.json` with absolute paths to this repo's `dist/*.js`, then reload Cursor.

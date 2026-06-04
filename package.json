@@ -7,7 +7,7 @@
     "cursor-supermemory": "./dist/cli.js"
   },
   "scripts": {
-    "build": "bun build ./src/cli.ts --outfile ./dist/cli.js --target node && bun build ./src/mcp-server.ts --outfile ./dist/mcp-server.js --target node && bun build ./src/hooks/session-start.ts --outfile ./dist/session-start.js --target node && bun build ./src/hooks/session-end.ts --outfile ./dist/session-end.js --target node",
+    "build": "bun build ./src/cli.ts --outfile ./dist/cli.js --target node && bun build ./src/mcp-server.ts --outfile ./dist/mcp-server.js --target node && bun build ./src/hooks/session-start.ts --outfile ./dist/session-start.js --target node && bun build ./src/hooks/session-end.ts --outfile ./dist/session-end.js --target node && bun build ./src/hooks/before-submit-prompt.ts --outfile ./dist/before-submit-prompt.js --target node && bun build ./src/hooks/post-tool-use.ts --outfile ./dist/post-tool-use.js --target node && bun build ./src/hooks/stop.ts --outfile ./dist/stop.js --target node && bun build ./src/hooks/pre-compact.ts --outfile ./dist/pre-compact.js --target node",
     "typecheck": "tsc --noEmit",
     "dev": "bun run src/cli.ts"
   },
