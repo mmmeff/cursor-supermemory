@@ -130,16 +130,16 @@ To share project memory with your team, commit the same `projectContainerTag` in
 ## Development
 
 ```bash
-bun install
-bun run build   # compiles all dist/ files
+npm install
+npm run build   # compiles all dist/ files
 ```
 
 ### Testing locally (without the marketplace)
 
 1. **Open this repo in Cursor** — rules, commands, skills, and hooks are picked up from `.cursor-plugin`.
-2. **Build:** `bun run build`
+2. **Build:** `npm run build`
 3. **Use the local MCP server** — `.cursor/mcp.json` in this repo points to `dist/` automatically.
-4. **Log in:** `bun run src/cli.ts login`
+4. **Log in:** `npm run dev -- login` or `node dist/cli.js login` after build
 5. **Restart Cursor** after changing `.cursor/mcp.json`.
 
 To test in a different project, add the `supermemory` entry from `.cursor/mcp.json` to that project's MCP config with an absolute path to `dist/mcp-server.js`.

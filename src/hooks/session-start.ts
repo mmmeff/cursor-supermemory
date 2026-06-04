@@ -4,6 +4,7 @@ import { getUserTag, getProjectTag } from "../tags.ts";
 import { createClient } from "../client.ts";
 import { formatContext } from "../context.ts";
 import { saveSession, loadSession } from "../sessionStore.ts";
+import { readStdinText } from "../stdin.ts";
 
 interface SessionStartInput {
   workspace_roots: string[];
@@ -21,7 +22,7 @@ const RECENT_PROJECT_NOTES = 5;
 const ok = () => process.stdout.write(JSON.stringify({ continue: true }));
 
 async function main() {
-  const raw = await Bun.stdin.text();
+  const raw = await readStdinText();
   const input: SessionStartInput = JSON.parse(raw);
 
   const creds = loadCredentials();

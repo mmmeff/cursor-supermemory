@@ -1,4 +1,5 @@
 import { claimPendingRecall } from "../sessionStore.ts";
+import { readStdinText } from "../stdin.ts";
 
 interface PostToolUseInput {
   conversation_id?: string;
@@ -10,7 +11,7 @@ const ok = () => process.stdout.write(JSON.stringify({ continue: true }));
 // (additional_context). We use it to deliver the recall that
 // beforeSubmitPrompt stashed, exactly once per turn (cleared on inject).
 async function main() {
-  const raw = await Bun.stdin.text();
+  const raw = await readStdinText();
   const input: PostToolUseInput = JSON.parse(raw);
 
   const conversationId = input.conversation_id ?? "";

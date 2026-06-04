@@ -1,6 +1,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { whichOnPath } from "./which.ts";
 
 // Default cheap/fast model for distillation. composer-2.5 is confirmed available
 // via `agent --list-models` and is the intended low-cost summarization model.
@@ -21,8 +23,7 @@ function resolveAgentBinary(): string | null {
   const localBin = join(homedir(), ".local", "bin", "agent");
   if (existsSync(localBin)) return localBin;
 
-  const onPath = Bun.which("agent");
-  return onPath ?? null;
+  return whichOnPath("agent");
 }
 
 export function isAgentCliAvailable(): boolean {
@@ -44,30 +45,32 @@ export async function runAgentCompletion(
   const binary = resolveAgentBinary();
   if (!binary) return null;
 
-  try {
-    const proc = Bun.spawn(
-      [
-        binary,
-        "-p",
-        prompt,
-        "--model",
-        model,
-        "--output-format",
-        "json",
-        // ask mode = read-only Q&A; --trust avoids the interactive workspace
-        // trust prompt in headless mode. No tools, no edits.
-        "--mode",
-        "ask",
-        "--trust",
-      ],
-      { stdout: "pipe", stderr: "pipe", stdin: "ignore" },
-    );
+  const args = [
+    "-p",
+    prompt,
+    "--model",
+    model,
+    "--output-format",
+    "json",
+    "--mode",
+    "ask",
+    "--trust",
+  ];
 
+  try {
+    const proc = spawn(binary, args, { stdio: ["ignore", "pipe", "pipe"] });
     const timeout = setTimeout(() => proc.kill(), CLI_TIMEOUT_MS);
-    const [stdout, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      proc.exited,
-    ]);
+
+    const { stdout, exitCode } = await new Promise<{ stdout: string; exitCode: number | null }>(
+      (resolve) => {
+        const chunks: Buffer[] = [];
+        proc.stdout?.on("data", (chunk) => chunks.push(chunk));
+        proc.on("error", () => resolve({ stdout: "", exitCode: 1 }));
+        proc.on("close", (code) =>
+          resolve({ stdout: Buffer.concat(chunks).toString("utf-8"), exitCode: code }),
+        );
+      },
+    );
     clearTimeout(timeout);
 
     if (exitCode !== 0) return null;

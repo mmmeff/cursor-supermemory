@@ -4,6 +4,7 @@ import { getUserTag, getProjectTag } from "../tags.ts";
 import { distillAndStore } from "../distill.ts";
 import { readExchanges, latestExchange } from "../transcript.ts";
 import { loadSession, saveSession, bufferToTranscript } from "../sessionStore.ts";
+import { readStdinText } from "../stdin.ts";
 
 // Distill accumulated turns into memory every N turns. Keeps per-turn cost low
 // by batching rather than calling the LLM on every single turn (Hermes-style
@@ -20,7 +21,7 @@ interface StopInput {
 const ok = () => process.stdout.write(JSON.stringify({ continue: true }));
 
 async function main() {
-  const raw = await Bun.stdin.text();
+  const raw = await readStdinText();
   const input: StopInput = JSON.parse(raw);
 
   const conversationId = input.conversation_id ?? "";

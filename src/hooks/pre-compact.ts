@@ -3,6 +3,7 @@ import { loadConfig, getApiKey } from "../config.ts";
 import { getUserTag, getProjectTag } from "../tags.ts";
 import { distillAndStore } from "../distill.ts";
 import { loadSession, saveSession, bufferToTranscript } from "../sessionStore.ts";
+import { readStdinText } from "../stdin.ts";
 
 interface PreCompactInput {
   conversation_id?: string;
@@ -16,7 +17,7 @@ const ok = () => process.stdout.write(JSON.stringify({ continue: true }));
 // memory now so insights aren't lost. (One of the few hooks that also runs on
 // cloud agents.)
 async function main() {
-  const raw = await Bun.stdin.text();
+  const raw = await readStdinText();
   const input: PreCompactInput = JSON.parse(raw);
 
   const conversationId = input.conversation_id ?? "";

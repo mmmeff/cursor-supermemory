@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+
 export interface Turn {
   role: string;
   content?: unknown;
@@ -50,9 +53,8 @@ export function parseTranscript(text: string): Turn[] {
 
 // Read a transcript file and return the user/assistant exchanges with text.
 export async function readExchanges(transcriptPath: string): Promise<Exchange[]> {
-  const file = Bun.file(transcriptPath);
-  if (!(await file.exists())) return [];
-  const turns = parseTranscript(await file.text());
+  if (!existsSync(transcriptPath)) return [];
+  const turns = parseTranscript(await readFile(transcriptPath, "utf-8"));
   return turns
     .filter((t) => t.role === "user" || t.role === "assistant")
     .map((t) => ({ role: t.role, text: extractTurnText(t) }))

@@ -3,42 +3,42 @@
     "sessionStart": [
       {
         "type": "command",
-        "command": "bun run \"${CURSOR_PLUGIN_ROOT}/dist/session-start.js\"",
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/session-start.js\"",
         "timeout": 20
       }
     ],
     "beforeSubmitPrompt": [
       {
         "type": "command",
-        "command": "bun run \"${CURSOR_PLUGIN_ROOT}/dist/before-submit-prompt.js\"",
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/before-submit-prompt.js\"",
         "timeout": 10
       }
     ],
     "postToolUse": [
       {
         "type": "command",
-        "command": "bun run \"${CURSOR_PLUGIN_ROOT}/dist/post-tool-use.js\"",
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/post-tool-use.js\"",
         "timeout": 10
       }
     ],
     "stop": [
       {
         "type": "command",
-        "command": "bun run \"${CURSOR_PLUGIN_ROOT}/dist/stop.js\"",
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/stop.js\"",
         "timeout": 120
       }
     ],
     "preCompact": [
       {
         "type": "command",
-        "command": "bun run \"${CURSOR_PLUGIN_ROOT}/dist/pre-compact.js\"",
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/pre-compact.js\"",
         "timeout": 120
       }
     ],
     "sessionEnd": [
       {
         "type": "command",
-        "command": "bun run \"${CURSOR_PLUGIN_ROOT}/dist/session-end.js\"",
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/session-end.js\"",
         "timeout": 120
       }
     ]

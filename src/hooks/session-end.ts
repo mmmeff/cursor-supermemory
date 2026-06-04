@@ -4,6 +4,7 @@ import { getUserTag, getProjectTag } from "../tags.ts";
 import { distillAndStore } from "../distill.ts";
 import { readExchanges } from "../transcript.ts";
 import { loadSession, clearSession, bufferToTranscript } from "../sessionStore.ts";
+import { readStdinText } from "../stdin.ts";
 
 interface SessionEndInput {
   session_id?: string;
@@ -14,7 +15,7 @@ interface SessionEndInput {
 }
 
 async function main() {
-  const raw = await Bun.stdin.text();
+  const raw = await readStdinText();
   const input: SessionEndInput = JSON.parse(raw);
 
   // Persist on any normal session end. Skip abnormal terminations.

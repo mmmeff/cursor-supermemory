@@ -1,6 +1,8 @@
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
+import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 
 const CREDENTIALS_DIR = path.join(os.homedir(), ".supermemory-cursor");
 const CREDENTIALS_FILE = path.join(CREDENTIALS_DIR, "credentials.json");
@@ -48,42 +50,42 @@ export async function startAuthFlow(
   return new Promise((resolve) => {
     let settled = false;
 
-    const server = Bun.serve({
-      port: AUTH_PORT,
-      hostname: "127.0.0.1",
-      fetch(req) {
-        const url = new URL(req.url);
-        if (url.pathname !== "/callback") {
-          return new Response("Not found", { status: 404 });
-        }
+    const server = createServer((req, res) => {
+      const url = new URL(req.url ?? "/", `http://127.0.0.1:${AUTH_PORT}`);
+      if (url.pathname !== "/callback") {
+        res.writeHead(404).end("Not found");
+        return;
+      }
 
-        const apiKey = url.searchParams.get("apikey") || url.searchParams.get("api_key");
-        if (!apiKey?.startsWith("sm_")) {
-          return new Response("Invalid API key", { status: 400 });
-        }
+      const apiKey = url.searchParams.get("apikey") || url.searchParams.get("api_key");
+      if (!apiKey?.startsWith("sm_")) {
+        res.writeHead(400).end("Invalid API key");
+        return;
+      }
 
-        saveCredentials(apiKey);
-        settled = true;
-        server.stop();
-        clearTimeout(timer);
-        resolve({ success: true, apiKey });
+      saveCredentials(apiKey);
+      settled = true;
+      server.close();
+      clearTimeout(timer);
+      resolve({ success: true, apiKey });
 
-        return new Response(SUCCESS_HTML, {
-          headers: { "Content-Type": "text/html" },
-        });
-      },
+      res.writeHead(200, { "Content-Type": "text/html" }).end(SUCCESS_HTML);
     });
+
+    server.listen(AUTH_PORT, "127.0.0.1");
 
     const callbackUrl = `http://localhost:${AUTH_PORT}/callback`;
     const authUrl = `${AUTH_URL}?callback=${encodeURIComponent(callbackUrl)}&client=cursor`;
 
     process.stderr.write(`\nOpen this URL to connect Supermemory to Cursor:\n\n  ${authUrl}\n\nWaiting...\n`);
     const opener = process.platform === "win32" ? "start" : process.platform === "darwin" ? "open" : "xdg-open";
-    Bun.$`${opener} ${authUrl}`.quiet().nothrow();
+    const openArgs = process.platform === "win32" ? ["/c", "start", "", authUrl] : [authUrl];
+    const openCmd = process.platform === "win32" ? "cmd" : opener;
+    spawn(openCmd, openArgs, { detached: true, stdio: "ignore" }).unref();
 
     const timer = setTimeout(() => {
       if (!settled) {
-        server.stop();
+        server.close();
         resolve({ success: false, error: "Authentication timed out" });
       }
     }, timeoutMs);

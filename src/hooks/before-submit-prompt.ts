@@ -3,6 +3,7 @@ import { loadConfig, getApiKey } from "../config.ts";
 import { getProjectTag } from "../tags.ts";
 import { searchRecall } from "../recall.ts";
 import { loadSession, saveSession, hashQuery, setPendingRecall, clearPendingRecall } from "../sessionStore.ts";
+import { readStdinText } from "../stdin.ts";
 
 interface BeforeSubmitPromptInput {
   conversation_id?: string;
@@ -16,7 +17,7 @@ const ok = () => process.stdout.write(JSON.stringify({ continue: true }));
 // beforeSubmitPrompt cannot inject context (only continue/user_message), so we
 // run query-scoped recall here and STASH it for post-tool-use to inject.
 async function main() {
-  const raw = await Bun.stdin.text();
+  const raw = await readStdinText();
   const input: BeforeSubmitPromptInput = JSON.parse(raw);
 
   const conversationId = input.conversation_id ?? "";
