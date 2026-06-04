@@ -2,6 +2,7 @@ import { loadCredentials } from "../auth.ts";
 import { loadConfig, getApiKey } from "../config.ts";
 import { getUserTag, getProjectTag } from "../tags.ts";
 import { createClient } from "../client.ts";
+import { distillTranscript, formatNotesForStorage } from "../distill.ts";
 
 interface SessionEndInput {
   session_id: string;
@@ -84,21 +85,38 @@ async function main() {
   const userTurns = relevant.filter((t) => t.role === "user");
   if (userTurns.length < 2) return;
 
-  let transcript = relevant
+  const transcript = relevant
     .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.text}`)
     .join("\n");
-  if (transcript.length > 100_000) {
-    transcript = transcript.slice(0, 100_000);
-  }
+
+  // Distill the transcript into condensed project/user learnings via the local
+  // Cursor Agent CLI rather than shipping the whole transcript. If inference is
+  // unavailable (CLI missing / not authenticated), distillTranscript returns
+  // null and we skip persistence — we never fall back to storing raw transcripts.
+  const notes = await distillTranscript(transcript);
+  if (!notes) return;
 
   const userTag = getUserTag(config);
   const projectTag = getProjectTag(workspaceRoot, config);
-  const content = `Cursor IDE session transcript:\n${transcript}`;
 
-  await Promise.allSettled([
-    createClient(apiKey, userTag).add({ content, containerTag: userTag }),
-    createClient(apiKey, projectTag).add({ content, containerTag: projectTag }),
-  ]);
+  const writes: Promise<unknown>[] = [];
+  if (notes.projectNotes.length) {
+    writes.push(
+      createClient(apiKey, projectTag).add({
+        content: formatNotesForStorage(notes.projectNotes, "project"),
+        containerTag: projectTag,
+      }),
+    );
+  }
+  if (notes.userNotes.length) {
+    writes.push(
+      createClient(apiKey, userTag).add({
+        content: formatNotesForStorage(notes.userNotes, "user"),
+        containerTag: userTag,
+      }),
+    );
+  }
+  if (writes.length) await Promise.allSettled(writes);
 }
 
 main().catch((err) => {
