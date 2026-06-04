@@ -9,6 +9,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/cursorInstall.test.ts",
     "dev": "tsx src/cli.ts",
     "prepare": "npm run build"
   },

@@ -8,7 +8,16 @@ Persistent AI memory for Cursor — powered by [Supermemory](https://supermemory
 npx github:mmmeff/cursor-supermemory login
 ```
 
-This installs the package from the repo and runs its build automatically, then opens your browser to connect Supermemory.
+This installs the npm package, runs its build, opens your browser to connect Supermemory, then prompts to install the plugin into `~/.cursor` (MCP config, rules, skills, commands, and hooks).
+
+To install or remove the Cursor integration manually:
+
+```bash
+npx github:mmmeff/cursor-supermemory install
+npx github:mmmeff/cursor-supermemory uninstall
+```
+
+Reload Cursor after install or uninstall.
 
 ## What it does
 
@@ -144,4 +153,4 @@ npm run build   # compiles all dist/ files
 
 To test in a different project, add the `supermemory` entry from `.cursor/mcp.json` to that project's MCP config with an absolute path to `dist/mcp-server.js`.
 
-For local hook testing outside the marketplace, Cursor may need explicit user-level hook registration. Add the built hook commands to `~/.cursor/hooks.json` with absolute paths to this repo's `dist/*.js`, then reload Cursor.
+From a dev checkout, run `npm run build` then `node dist/cli.js install` to copy assets into `~/.cursor/plugins/local/cursor-supermemory` and update `~/.cursor/hooks.json` and `~/.cursor/mcp.json`.

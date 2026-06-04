@@ -5,8 +5,18 @@ import {
   startAuthFlow,
   clearCredentials,
 } from "./auth.ts";
+import { installPlugin, uninstallPlugin, isPluginInstalled } from "./cursorInstall.ts";
+import { confirmDefaultYes } from "./prompt.ts";
 
 const command = process.argv[2];
+
+function reportInstallResult(result: { ok: boolean; message: string }): void {
+  if (result.ok) console.log(result.message);
+  else {
+    console.error(result.message);
+    process.exit(1);
+  }
+}
 
 switch (command) {
   case "mcp":
@@ -23,6 +33,9 @@ switch (command) {
     const result = await startAuthFlow();
     if (result.success) {
       console.log("Authenticated successfully.");
+      if (await confirmDefaultYes("Install Supermemory into Cursor (MCP, rules, hooks)?")) {
+        reportInstallResult(installPlugin());
+      }
     } else {
       console.error(`Authentication failed: ${result.error}`);
       process.exit(1);
@@ -36,6 +49,16 @@ switch (command) {
     break;
   }
 
+  case "install": {
+    reportInstallResult(installPlugin());
+    break;
+  }
+
+  case "uninstall": {
+    reportInstallResult(uninstallPlugin());
+    break;
+  }
+
   case "status": {
     const creds = loadCredentials();
     if (creds) {
@@ -44,6 +67,11 @@ switch (command) {
     } else {
       console.log("Not authenticated. Run `cursor-supermemory login` to connect.");
     }
+    console.log(
+      isPluginInstalled()
+        ? "Cursor plugin: installed"
+        : "Cursor plugin: not installed (run `install`)",
+    );
     break;
   }
 
@@ -51,9 +79,11 @@ switch (command) {
     console.log(`cursor-supermemory — Persistent AI memory for Cursor
 
 Commands:
-  mcp      Start the MCP server (stdio)
-  login    Authenticate with Supermemory
-  logout   Remove stored credentials
-  status   Show authentication status`);
+  mcp        Start the MCP server (stdio)
+  login      Authenticate with Supermemory
+  install    Install MCP, rules, hooks into ~/.cursor
+  uninstall  Remove plugin from ~/.cursor
+  logout     Remove stored credentials
+  status     Show authentication status`);
     if (command) process.exit(1);
 }
