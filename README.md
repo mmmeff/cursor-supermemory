@@ -4,11 +4,11 @@ Persistent AI memory for Cursor — powered by [Supermemory](https://supermemory
 
 ## Install
 
-Install from the [Cursor Marketplace](https://cursor.com/marketplace), then authenticate:
-
 ```bash
-bunx cursor-supermemory@latest login
+npx github:mmmeff/cursor-supermemory login
 ```
+
+This installs the package from the repo and runs its build automatically, then opens your browser to connect Supermemory.
 
 ## What it does
 
