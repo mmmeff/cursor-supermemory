@@ -5,7 +5,7 @@ Persistent AI memory for Cursor — powered by [Supermemory](https://supermemory
 ## Install
 
 ```bash
-npx github:mmmeff/cursor-supermemory login
+npx -y github:mmmeff/cursor-supermemory login
 ```
 
 This installs the npm package, runs its build, opens your browser to connect Supermemory, then prompts to install the plugin into `~/.cursor` (MCP config, rules, skills, commands, and hooks).
