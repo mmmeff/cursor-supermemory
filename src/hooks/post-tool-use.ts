@@ -1,6 +1,6 @@
 import { searchRecallForQueries } from "../recall.ts";
 import { deriveMidTurnRecallQueries } from "../recallQueries.ts";
-import { writeRecallFile } from "../recallFile.ts";
+import { getRecallFilePath, withRecallFileHeader, writeRecallFile } from "../recallFile.ts";
 import {
   buildTrajectoryContext,
   formatTopicalRecallBlock,
@@ -51,8 +51,9 @@ async function main() {
   );
 
   const contextParts: string[] = [];
+  const recallFilePath = getRecallFilePath(auth.projectTag, conversationId);
   const pendingTurnStart = claimPendingRecall(conversationId);
-  if (pendingTurnStart) contextParts.push(pendingTurnStart);
+  if (pendingTurnStart) contextParts.push(withRecallFileHeader(recallFilePath, pendingTurnStart));
 
   if (shouldRefreshMidTurnRecall(session, auth.config)) {
     const trajectory = buildTrajectoryContext(session, auth.config.midTurnRecallRecentTools);
@@ -65,9 +66,9 @@ async function main() {
     );
 
     if (recall) {
-      writeRecallFile(auth.projectTag, recall, workspaceRoot);
+      writeRecallFile(auth.projectTag, conversationId, recall, workspaceRoot);
       markMidTurnRefresh(session);
-      contextParts.push(formatTopicalRecallBlock(recall));
+      contextParts.push(withRecallFileHeader(recallFilePath, formatTopicalRecallBlock(recall)));
     }
   }
 

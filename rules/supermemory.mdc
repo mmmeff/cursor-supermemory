@@ -10,11 +10,13 @@ You have access to Supermemory MCP tools for persistent memory across coding ses
 - `supermemory_profile`: Get aggregated user profile and preferences
 - `supermemory_list`: List recent memories for this project
 - `supermemory_forget`: Delete a specific memory by ID
+- `supermemory_get_config`: Returns `recallFilePath` for this session when `conversationId` is provided, or a single unambiguous recent path otherwise
 
 Per-turn recall (read before other tool calls):
-- At the start of each turn, before any other tool call, read `.cursor/.supermemory/current-recall.md` if it exists and is non-empty
-- That file is written synchronously from the user's prompt before you run; use it silently when helpful and ignore it when irrelevant
-- Mid-turn, that file may be refreshed as the investigation shifts — re-read it if you have not read it recently and it may contain newer topical recall
+- Each composer session has its own recall file at `~/.cursor/.supermemory/recall/{projectTag}/{conversationId}/current-recall.md` (outside the project tree)
+- At turn start, resolve the path from session context (`Supermemory recall file for this session: ...`), from the `Supermemory recall file:` line in injected recall blocks, or via `supermemory_get_config({ conversationId })` when you know the conversation id
+- Read that absolute path before other tool calls if the file exists and is non-empty; use it silently when helpful
+- Mid-turn, the file may be refreshed — re-read the same session path if topical recall may have updated (the path is stable for the session; content changes)
 - Do not mention the file or recall pipeline unless the user asks
 
 When to use MCP tools:

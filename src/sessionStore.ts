@@ -29,8 +29,12 @@ export interface SessionState {
 
 const SESSIONS_DIR = join(homedir(), ".cursor", ".supermemory", "sessions");
 
-function safeId(conversationId: string): string {
+export function safeConversationId(conversationId: string): string {
   return conversationId.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+function safeId(conversationId: string): string {
+  return safeConversationId(conversationId);
 }
 
 function sessionPath(conversationId: string): string {

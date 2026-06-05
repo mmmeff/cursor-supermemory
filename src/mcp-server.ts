@@ -4,7 +4,7 @@ import { z } from "zod";
 import { loadConfig, getProjectConfigPath, GLOBAL_CONFIG_PATH, writeConfig, type ConfigUpdates } from "./config.ts";
 import { resolveAuth, resolveContainerTag, type AuthContext } from "./authContext.ts";
 import { createClient } from "./client.ts";
-import { getRecallFilePath } from "./recallFile.ts";
+import { resolveRecallFilePathForLookup } from "./recallFile.ts";
 import { memoryBody } from "./memoryText.ts";
 
 function requireAuth(): AuthContext {
@@ -30,13 +30,19 @@ export async function startMcpServer() {
     "supermemory_get_config",
     {
       description:
-        "Show the current supermemory configuration — effective settings, resolved container tags, and config file paths.",
-      inputSchema: {},
+        "Show the current supermemory configuration — effective settings, resolved container tags, config file paths, and staged recall file location.",
+      inputSchema: {
+        conversationId: z
+          .string()
+          .optional()
+          .describe("Composer conversation id for this agent session — returns the exact recall file path"),
+      },
     },
-    async () => {
+    async ({ conversationId }) => {
       const cwd = process.cwd();
       const config = loadConfig(cwd);
       const auth = requireAuth();
+      const recallLookup = resolveRecallFilePathForLookup(auth.projectTag, conversationId);
       return textResult({
         effectiveConfig: {
           userContainerTag: config.userContainerTag ?? "(auto-derived from git email / machine id)",
@@ -55,7 +61,13 @@ export async function startMcpServer() {
           user: auth.userTag,
           project: auth.projectTag,
         },
-        recallFilePath: getRecallFilePath(auth.projectTag),
+        recallFilePath: recallLookup.recallFilePath,
+        recallFilePathPattern: conversationId
+          ? undefined
+          : "~/.cursor/.supermemory/recall/{projectTag}/{conversationId}/current-recall.md",
+        recallLookup: recallLookup.ambiguous
+          ? { ambiguous: true, candidates: recallLookup.candidates }
+          : undefined,
         configFiles: {
           project: getProjectConfigPath(cwd),
           global: GLOBAL_CONFIG_PATH,

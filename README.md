@@ -33,7 +33,7 @@ The plugin uses Cursor hooks to keep memory useful without manual prompts:
 | Hook | Behavior |
 |---|---|
 | `sessionStart` | Injects ambient context: your user profile plus the most recent project notes |
-| `beforeSubmitPrompt` | Derives two extra recall queries via Composer 2.5, searches memory with all three, writes staged recall to `~/.cursor/.supermemory/recall/{projectTag}/current-recall.md`, and stages hook injection |
+| `beforeSubmitPrompt` | Derives two extra recall queries via Composer 2.5, searches memory with all three, writes staged recall to `~/.cursor/.supermemory/recall/{projectTag}/{conversationId}/current-recall.md`, and stages hook injection |
 | `afterAgentThought` | Stores recent thinking to enrich mid-turn recall query generation |
 | `postToolUse` | Injects turn-start recall on the first tool; refreshes topical recall on a cadence mid-turn, rewrites the recall file, and injects via `additional_context` |
 | `stop` | Buffers completed turns and distills them every 3 turns |
@@ -116,9 +116,11 @@ Project config wins over global config. Add `.cursor/.supermemory/config.json` t
 
 Per-turn recall is written outside the project tree so it never appears in git status:
 
-`~/.cursor/.supermemory/recall/{projectTag}/current-recall.md`
+`~/.cursor/.supermemory/recall/{projectTag}/{conversationId}/current-recall.md`
 
-`{projectTag}` is the resolved project container tag (e.g. `cursor_project_a1b2c3d4e5f67890`). Hooks write this file; the always-on rule has the agent resolve the path via `supermemory_get_config` → `recallFilePath`, then read it with the Read tool. Legacy workspace-local files at `.cursor/.supermemory/current-recall.md` are removed when recall is next written.
+Each composer session gets its own subdirectory so parallel agents in the same project do not overwrite each other's recall. `{projectTag}` is the resolved project container tag; `{conversationId}` is the composer conversation id (sanitized for the filesystem).
+
+Hooks write this file; the always-on rule has the agent resolve the path from session-start context, injected recall headers (`Supermemory recall file: ...`), or `supermemory_get_config({ conversationId })`. Without a conversation id, `supermemory_get_config` returns a single unambiguous recent path when only one session has written recall recently; otherwise it returns `recallLookup.ambiguous` and the agent must use the path from injected recall blocks.
 
 **Global example** — `~/.config/cursor/supermemory.json`:
 

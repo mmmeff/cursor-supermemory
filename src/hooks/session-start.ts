@@ -1,5 +1,6 @@
 import { createClient } from "../client.ts";
 import { formatContext, coerceProfile } from "../context.ts";
+import { getRecallFilePath } from "../recallFile.ts";
 import { loadSession, saveSession } from "../sessionStore.ts";
 import { hookOk, readHookInput, resolveHookAuth, runHookSafe } from "../hookRuntime.ts";
 import { coerceMemoryDocuments } from "../memoryText.ts";
@@ -43,13 +44,20 @@ async function main() {
   await Promise.all([profilePromise, memoriesPromise]);
 
   const context = formatContext(profile, memories);
-  if (!context) return hookOk();
+  const recallFilePath = conversationId
+    ? getRecallFilePath(auth.projectTag, conversationId)
+    : null;
+
+  const lines: string[] = [];
+  if (context) lines.push(context);
+  if (recallFilePath) lines.push(`Supermemory recall file for this session: ${recallFilePath}`);
+  if (!lines.length) return hookOk();
 
   process.stdout.write(JSON.stringify({
     continue: true,
     hookSpecificOutput: {
       hookEventName: "sessionStart",
-      additionalContext: context,
+      additionalContext: lines.join("\n\n"),
     },
   }));
 }
