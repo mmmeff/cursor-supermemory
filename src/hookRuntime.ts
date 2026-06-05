@@ -13,6 +13,16 @@ export function hookOk(): void {
   process.stdout.write(JSON.stringify({ continue: true }));
 }
 
+export function hookPostToolAdditionalContext(context: string): void {
+  process.stdout.write(JSON.stringify({
+    continue: true,
+    hookSpecificOutput: {
+      hookEventName: "postToolUse",
+      additionalContext: context,
+    },
+  }));
+}
+
 export function runHookSafe(label: string, fn: () => Promise<void>): void {
   fn().catch((err) => {
     console.error(`[supermemory] ${label} error:`, err);

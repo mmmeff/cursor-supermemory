@@ -10,6 +10,7 @@ const hookArtifacts = [
   "session-end.js",
   "before-submit-prompt.js",
   "post-tool-use.js",
+  "after-agent-thought.js",
   "stop.js",
   "pre-compact.js",
 ];

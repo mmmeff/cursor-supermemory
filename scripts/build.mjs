@@ -5,6 +5,7 @@ const hookEntries = [
   ["src/hooks/session-end.ts", "dist/session-end.js"],
   ["src/hooks/before-submit-prompt.ts", "dist/before-submit-prompt.js"],
   ["src/hooks/post-tool-use.ts", "dist/post-tool-use.js"],
+  ["src/hooks/after-agent-thought.ts", "dist/after-agent-thought.js"],
   ["src/hooks/stop.ts", "dist/stop.js"],
   ["src/hooks/pre-compact.ts", "dist/pre-compact.js"],
 ];

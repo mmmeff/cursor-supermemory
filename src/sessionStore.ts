@@ -17,6 +17,14 @@ export interface SessionState {
   buffer: BufferedTurn[];
   // Total turns seen this session (drives the batch-distill cadence).
   turnCount: number;
+  // Mid-turn recall state (scoped to the current user message / generation).
+  userPromptThisGeneration: string;
+  generationId: string | null;
+  toolCountThisGeneration: number;
+  midTurnRefreshCountThisGeneration: number;
+  lastMidTurnRefreshMs: number;
+  recentTools: string[];
+  thoughtSnippet: string | null;
 }
 
 const SESSIONS_DIR = join(homedir(), ".cursor", ".supermemory", "sessions");
@@ -93,6 +101,13 @@ function emptyState(conversationId: string): SessionState {
     pendingRecallQueryHash: null,
     buffer: [],
     turnCount: 0,
+    userPromptThisGeneration: "",
+    generationId: null,
+    toolCountThisGeneration: 0,
+    midTurnRefreshCountThisGeneration: 0,
+    lastMidTurnRefreshMs: 0,
+    recentTools: [],
+    thoughtSnippet: null,
   };
 }
 

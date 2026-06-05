@@ -150,6 +150,7 @@ export async function installAgentCli(): Promise<boolean> {
 export async function runAgentCompletion(
   prompt: string,
   model: string = DEFAULT_DISTILL_MODEL,
+  timeoutMs: number = CLI_TIMEOUT_MS,
 ): Promise<string | null> {
   const binary = resolveAgentBinary();
   if (!binary) return null;
@@ -157,7 +158,7 @@ export async function runAgentCompletion(
   const { stdout, exitCode } = await runCommand(
     binary,
     ["-p", prompt, "--model", model, "--output-format", "json", "--mode", "ask", "--trust"],
-    { timeoutMs: CLI_TIMEOUT_MS },
+    { timeoutMs },
   );
 
   if (exitCode !== 0) return null;

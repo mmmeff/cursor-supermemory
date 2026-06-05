@@ -11,7 +11,13 @@ You have access to Supermemory MCP tools for persistent memory across coding ses
 - `supermemory_list`: List recent memories for this project
 - `supermemory_forget`: Delete a specific memory by ID
 
-When to use:
+Per-turn recall (read before other tool calls):
+- At the start of each turn, before any other tool call, read `.cursor/.supermemory/current-recall.md` if it exists and is non-empty
+- That file is written synchronously from the user's prompt before you run; use it silently when helpful and ignore it when irrelevant
+- Mid-turn, that file may be refreshed as the investigation shifts — re-read it if you have not read it recently and it may contain newer topical recall
+- Do not mention the file or recall pipeline unless the user asks
+
+When to use MCP tools:
 - User mentions past sessions, previous work, or "last time" → search first
 - User says "remember", "save this", "don't forget" → add immediately
 - After solving a hard bug → save the solution and root cause

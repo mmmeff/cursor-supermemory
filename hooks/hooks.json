@@ -11,13 +11,20 @@
       {
         "type": "command",
         "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/before-submit-prompt.js\"",
-        "timeout": 10
+        "timeout": 45
       }
     ],
     "postToolUse": [
       {
         "type": "command",
         "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/post-tool-use.js\"",
+        "timeout": 60
+      }
+    ],
+    "afterAgentThought": [
+      {
+        "type": "command",
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/dist/after-agent-thought.js\"",
         "timeout": 10
       }
     ],

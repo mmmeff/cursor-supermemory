@@ -25,15 +25,25 @@ export interface Config {
   injectProfile: boolean;
   userContainerTag: string | null;
   projectContainerTag: string | null;
+  midTurnRecallEnabled: boolean;
+  midTurnRecallEveryNTools: number;
+  midTurnRecallMinIntervalMs: number;
+  midTurnRecallMaxPerTurn: number;
+  midTurnRecallRecentTools: number;
 }
 
 const DEFAULTS: Omit<Config, "apiKey"> = {
   similarityThreshold: 0.3,
   maxMemories: 10,
-  maxProjectMemories: 5,
+  maxProjectMemories: 10,
   injectProfile: true,
   userContainerTag: null,
   projectContainerTag: null,
+  midTurnRecallEnabled: true,
+  midTurnRecallEveryNTools: 5,
+  midTurnRecallMinIntervalMs: 15_000,
+  midTurnRecallMaxPerTurn: 2,
+  midTurnRecallRecentTools: 5,
 };
 
 export function parseConfigFields(raw: Record<string, unknown> | null): Partial<Config> {
@@ -47,6 +57,15 @@ export function parseConfigFields(raw: Record<string, unknown> | null): Partial<
   if (typeof raw.injectProfile === "boolean") out.injectProfile = raw.injectProfile;
   if (typeof raw.userContainerTag === "string") out.userContainerTag = raw.userContainerTag;
   if (typeof raw.projectContainerTag === "string") out.projectContainerTag = raw.projectContainerTag;
+  if (typeof raw.midTurnRecallEnabled === "boolean") out.midTurnRecallEnabled = raw.midTurnRecallEnabled;
+  if (typeof raw.midTurnRecallEveryNTools === "number") out.midTurnRecallEveryNTools = raw.midTurnRecallEveryNTools;
+  if (typeof raw.midTurnRecallMinIntervalMs === "number") {
+    out.midTurnRecallMinIntervalMs = raw.midTurnRecallMinIntervalMs;
+  }
+  if (typeof raw.midTurnRecallMaxPerTurn === "number") out.midTurnRecallMaxPerTurn = raw.midTurnRecallMaxPerTurn;
+  if (typeof raw.midTurnRecallRecentTools === "number") {
+    out.midTurnRecallRecentTools = raw.midTurnRecallRecentTools;
+  }
   return out;
 }
 
@@ -78,6 +97,11 @@ export function loadConfig(cwd?: string): Config {
     injectProfile: merged.injectProfile,
     userContainerTag: merged.userContainerTag,
     projectContainerTag: merged.projectContainerTag,
+    midTurnRecallEnabled: merged.midTurnRecallEnabled,
+    midTurnRecallEveryNTools: merged.midTurnRecallEveryNTools,
+    midTurnRecallMinIntervalMs: merged.midTurnRecallMinIntervalMs,
+    midTurnRecallMaxPerTurn: merged.midTurnRecallMaxPerTurn,
+    midTurnRecallRecentTools: merged.midTurnRecallRecentTools,
   };
 }
 

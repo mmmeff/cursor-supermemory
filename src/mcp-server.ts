@@ -44,6 +44,11 @@ export async function startMcpServer() {
           maxMemories: config.maxMemories,
           maxProjectMemories: config.maxProjectMemories,
           injectProfile: config.injectProfile,
+          midTurnRecallEnabled: config.midTurnRecallEnabled,
+          midTurnRecallEveryNTools: config.midTurnRecallEveryNTools,
+          midTurnRecallMinIntervalMs: config.midTurnRecallMinIntervalMs,
+          midTurnRecallMaxPerTurn: config.midTurnRecallMaxPerTurn,
+          midTurnRecallRecentTools: config.midTurnRecallRecentTools,
         },
         resolvedTags: {
           user: auth.userTag,
@@ -70,6 +75,11 @@ export async function startMcpServer() {
         maxMemories: z.number().int().positive().optional(),
         maxProjectMemories: z.number().int().positive().optional(),
         injectProfile: z.boolean().optional(),
+        midTurnRecallEnabled: z.boolean().optional(),
+        midTurnRecallEveryNTools: z.number().int().positive().optional(),
+        midTurnRecallMinIntervalMs: z.number().int().nonnegative().optional(),
+        midTurnRecallMaxPerTurn: z.number().int().nonnegative().optional(),
+        midTurnRecallRecentTools: z.number().int().positive().optional(),
       },
     },
     async ({ scope, ...updates }) => {
