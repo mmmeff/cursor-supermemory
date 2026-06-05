@@ -38,10 +38,10 @@ async function main() {
   );
   if (recall) {
     setPendingRecall(conversationId, recall);
-    writeRecallFile(workspaceRoot, recall);
+    writeRecallFile(auth.projectTag, recall, workspaceRoot);
   } else {
     clearPendingRecall(conversationId);
-    clearRecallFile(workspaceRoot);
+    clearRecallFile(auth.projectTag, workspaceRoot);
   }
   session.pendingRecallQueryHash = recall ? queryHash : null;
   saveSession(session);

@@ -33,9 +33,9 @@ The plugin uses Cursor hooks to keep memory useful without manual prompts:
 | Hook | Behavior |
 |---|---|
 | `sessionStart` | Injects ambient context: your user profile plus the most recent project notes |
-| `beforeSubmitPrompt` | Derives two extra recall queries via Composer 2.5, searches memory with all three, writes `.cursor/.supermemory/current-recall.md`, and stages recall for hook injection |
+| `beforeSubmitPrompt` | Derives two extra recall queries via Composer 2.5, searches memory with all three, writes staged recall to `~/.cursor/.supermemory/recall/{projectTag}/current-recall.md`, and stages hook injection |
 | `afterAgentThought` | Stores recent thinking to enrich mid-turn recall query generation |
-| `postToolUse` | Injects turn-start recall on the first tool; refreshes topical recall on a cadence mid-turn, rewrites `current-recall.md`, and injects via `additional_context` |
+| `postToolUse` | Injects turn-start recall on the first tool; refreshes topical recall on a cadence mid-turn, rewrites the recall file, and injects via `additional_context` |
 | `stop` | Buffers completed turns and distills them every 3 turns |
 | `preCompact` | Flushes buffered turns before Cursor compacts context |
 | `sessionEnd` | Final sweep for any buffered turns |
@@ -111,6 +111,14 @@ Env vars override config-file values for container tags. If no tag is set explic
 | `.cursor/.supermemory/config.json` | Project — overrides global for this workspace |
 
 Project config wins over global config. Add `.cursor/.supermemory/config.json` to `.gitignore` when it contains an `apiKey`. A file with only shared `projectContainerTag` and non-secret defaults is safe to commit.
+
+### Staged recall file
+
+Per-turn recall is written outside the project tree so it never appears in git status:
+
+`~/.cursor/.supermemory/recall/{projectTag}/current-recall.md`
+
+`{projectTag}` is the resolved project container tag (e.g. `cursor_project_a1b2c3d4e5f67890`). Hooks write this file; the always-on rule has the agent resolve the path via `supermemory_get_config` → `recallFilePath`, then read it with the Read tool. Legacy workspace-local files at `.cursor/.supermemory/current-recall.md` are removed when recall is next written.
 
 **Global example** — `~/.config/cursor/supermemory.json`:
 

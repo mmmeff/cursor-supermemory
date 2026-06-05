@@ -4,6 +4,7 @@ import { z } from "zod";
 import { loadConfig, getProjectConfigPath, GLOBAL_CONFIG_PATH, writeConfig, type ConfigUpdates } from "./config.ts";
 import { resolveAuth, resolveContainerTag, type AuthContext } from "./authContext.ts";
 import { createClient } from "./client.ts";
+import { getRecallFilePath } from "./recallFile.ts";
 import { memoryBody } from "./memoryText.ts";
 
 function requireAuth(): AuthContext {
@@ -54,6 +55,7 @@ export async function startMcpServer() {
           user: auth.userTag,
           project: auth.projectTag,
         },
+        recallFilePath: getRecallFilePath(auth.projectTag),
         configFiles: {
           project: getProjectConfigPath(cwd),
           global: GLOBAL_CONFIG_PATH,

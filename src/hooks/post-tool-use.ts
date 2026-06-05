@@ -65,7 +65,7 @@ async function main() {
     );
 
     if (recall) {
-      writeRecallFile(workspaceRoot, recall);
+      writeRecallFile(auth.projectTag, recall, workspaceRoot);
       markMidTurnRefresh(session);
       contextParts.push(formatTopicalRecallBlock(recall));
     }
