@@ -7,6 +7,8 @@ import {
 } from "./auth.ts";
 import { installPlugin, uninstallPlugin, isPluginInstalled } from "./cursorInstall.ts";
 import { confirmDefaultYes } from "./prompt.ts";
+import { getAgentCliStatus } from "./agentCli.ts";
+import { ensureAgentCliReady } from "./agentCliSetup.ts";
 
 const command = process.argv[2];
 
@@ -16,6 +18,10 @@ function reportInstallResult(result: { ok: boolean; message: string }): void {
     console.error(result.message);
     process.exit(1);
   }
+}
+
+function reportAgentCliSetup(result: { ok: boolean; lines: string[] }): void {
+  if (result.lines.length > 0) console.log(result.lines.join("\n"));
 }
 
 switch (command) {
@@ -35,6 +41,7 @@ switch (command) {
       console.log("Authenticated successfully.");
       if (await confirmDefaultYes("Install Supermemory into Cursor (MCP, rules, hooks)?")) {
         reportInstallResult(installPlugin());
+        reportAgentCliSetup(await ensureAgentCliReady());
       }
     } else {
       console.error(`Authentication failed: ${result.error}`);
@@ -51,6 +58,7 @@ switch (command) {
 
   case "install": {
     reportInstallResult(installPlugin());
+    reportAgentCliSetup(await ensureAgentCliReady());
     break;
   }
 
@@ -72,6 +80,17 @@ switch (command) {
         ? "Cursor plugin: installed"
         : "Cursor plugin: not installed (run `install`)",
     );
+
+    const agentStatus = await getAgentCliStatus();
+    if (!agentStatus.available) {
+      console.log("Cursor Agent CLI: not installed (automatic capture disabled)");
+    } else if (agentStatus.authenticated) {
+      console.log(
+        `Cursor Agent CLI: authenticated${agentStatus.email ? ` as ${agentStatus.email}` : ""}`,
+      );
+    } else {
+      console.log("Cursor Agent CLI: installed but not authenticated (run `agent login`)");
+    }
     break;
   }
 
