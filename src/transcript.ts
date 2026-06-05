@@ -74,9 +74,13 @@ export function latestExchange(exchanges: Exchange[]): { user: string; assistant
   }
   if (lastAssistantIdx === -1) return null;
 
-  // Find the user message immediately preceding this assistant block.
+  let firstAssistantIdx = lastAssistantIdx;
+  while (firstAssistantIdx > 0 && exchanges[firstAssistantIdx - 1].role === "assistant") {
+    firstAssistantIdx--;
+  }
+
   let userIdx = -1;
-  for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+  for (let i = firstAssistantIdx - 1; i >= 0; i--) {
     if (exchanges[i].role === "user") {
       userIdx = i;
       break;
@@ -84,11 +88,16 @@ export function latestExchange(exchanges: Exchange[]): { user: string; assistant
   }
 
   const assistant = exchanges
-    .slice(lastAssistantIdx)
-    .filter((e) => e.role === "assistant")
+    .slice(firstAssistantIdx, lastAssistantIdx + 1)
     .map((e) => e.text)
     .join("\n");
   const user = userIdx === -1 ? "" : exchanges[userIdx].text;
   if (!assistant) return null;
   return { user, assistant };
+}
+
+export function exchangesToTranscript(exchanges: Exchange[]): string {
+  return exchanges
+    .map((e) => `${e.role === "user" ? "User" : "Assistant"}: ${e.text}`)
+    .join("\n");
 }

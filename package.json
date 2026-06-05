@@ -8,8 +8,9 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "smoke": "node scripts/smoke-build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/cursorInstall.test.ts src/agentCli.test.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "dev": "tsx src/cli.ts",
     "prepare": "npm run build"
   },

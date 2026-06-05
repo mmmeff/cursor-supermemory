@@ -1,6 +1,6 @@
 import path from "node:path";
 import os from "node:os";
-import fs from "node:fs";
+import { readJsonFile, writeJsonFile } from "./jsonFile.ts";
 import { loadCredentials } from "./auth.ts";
 
 export const GLOBAL_CONFIG_PATH = path.join(os.homedir(), ".config", "cursor", "supermemory.json");
@@ -9,11 +9,12 @@ export function getProjectConfigPath(cwd: string): string {
   return path.join(cwd, ".cursor", ".supermemory", "config.json");
 }
 
-export function writeConfig(updates: Partial<Omit<Config, "apiKey">>, scope: "project" | "global", cwd = process.cwd()): void {
+export type ConfigUpdates = Partial<Omit<Config, "apiKey">>;
+
+export function writeConfig(updates: ConfigUpdates, scope: "project" | "global", cwd = process.cwd()): void {
   const filePath = scope === "project" ? getProjectConfigPath(cwd) : GLOBAL_CONFIG_PATH;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const existing = readJson(filePath) ?? {};
-  fs.writeFileSync(filePath, JSON.stringify({ ...existing, ...updates }, null, 2));
+  const existing = readJsonFile<Record<string, unknown>>(filePath) ?? {};
+  writeJsonFile(filePath, { ...existing, ...updates });
 }
 
 export interface Config {
@@ -35,21 +36,26 @@ const DEFAULTS: Omit<Config, "apiKey"> = {
   projectContainerTag: null,
 };
 
-function readJson(filePath: string): Record<string, any> | null {
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
-  } catch {
-    return null;
-  }
+export function parseConfigFields(raw: Record<string, unknown> | null): Partial<Config> {
+  if (!raw) return {};
+
+  const out: Partial<Config> = {};
+  if (typeof raw.apiKey === "string") out.apiKey = raw.apiKey;
+  if (typeof raw.similarityThreshold === "number") out.similarityThreshold = raw.similarityThreshold;
+  if (typeof raw.maxMemories === "number") out.maxMemories = raw.maxMemories;
+  if (typeof raw.maxProjectMemories === "number") out.maxProjectMemories = raw.maxProjectMemories;
+  if (typeof raw.injectProfile === "boolean") out.injectProfile = raw.injectProfile;
+  if (typeof raw.userContainerTag === "string") out.userContainerTag = raw.userContainerTag;
+  if (typeof raw.projectContainerTag === "string") out.projectContainerTag = raw.projectContainerTag;
+  return out;
 }
 
-function findProjectConfig(cwd: string): Record<string, any> | null {
+function findProjectConfig(cwd: string): Partial<Config> | null {
   let dir = cwd;
   while (true) {
     const configPath = path.join(dir, ".cursor", ".supermemory", "config.json");
-    const data = readJson(configPath);
-    if (data) return data;
+    const data = readJsonFile<Record<string, unknown>>(configPath);
+    if (data) return parseConfigFields(data);
 
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -60,9 +66,9 @@ function findProjectConfig(cwd: string): Record<string, any> | null {
 
 export function loadConfig(cwd?: string): Config {
   const projectConfig = findProjectConfig(cwd || process.cwd());
-  const globalConfig = readJson(GLOBAL_CONFIG_PATH);
+  const globalConfig = parseConfigFields(readJsonFile<Record<string, unknown>>(GLOBAL_CONFIG_PATH));
 
-  const merged: Record<string, any> = { ...DEFAULTS, ...globalConfig, ...projectConfig };
+  const merged = { ...DEFAULTS, ...globalConfig, ...projectConfig };
 
   return {
     apiKey: process.env.SUPERMEMORY_API_KEY ?? merged.apiKey ?? null,

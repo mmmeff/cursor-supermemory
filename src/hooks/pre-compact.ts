@@ -1,9 +1,5 @@
-import { loadCredentials } from "../auth.ts";
-import { loadConfig, getApiKey } from "../config.ts";
-import { getUserTag, getProjectTag } from "../tags.ts";
-import { distillAndStore } from "../distill.ts";
-import { loadSession, saveSession, bufferToTranscript } from "../sessionStore.ts";
-import { readStdinText } from "../stdin.ts";
+import { loadSession, saveSession } from "../sessionStore.ts";
+import { flushSessionBuffer, hookOk, readHookInput, resolveHookAuth, runHookSafe } from "../hookRuntime.ts";
 
 interface PreCompactInput {
   conversation_id?: string;
@@ -11,47 +7,23 @@ interface PreCompactInput {
   user_email?: string;
 }
 
-const ok = () => process.stdout.write(JSON.stringify({ continue: true }));
-
-// Context is about to be compacted — flush whatever turns we've buffered into
-// memory now so insights aren't lost. (One of the few hooks that also runs on
-// cloud agents.)
 async function main() {
-  const raw = await readStdinText();
-  const input: PreCompactInput = JSON.parse(raw);
+  const input = await readHookInput<PreCompactInput>();
 
   const conversationId = input.conversation_id ?? "";
-  if (!conversationId) return ok();
+  if (!conversationId) return hookOk();
 
   const session = loadSession(conversationId);
-  if (!session.buffer.length) return ok();
+  if (!session.buffer.length) return hookOk();
 
-  const creds = loadCredentials();
-  if (!creds) return ok();
+  const auth = resolveHookAuth(input);
+  if (!auth) return hookOk();
 
-  if (input.user_email && !process.env.CURSOR_USER_EMAIL) {
-    process.env.CURSOR_USER_EMAIL = input.user_email;
-  }
-
-  const workspaceRoot = input.workspace_roots?.[0] || process.cwd();
-  const config = loadConfig(workspaceRoot);
-  const apiKey = getApiKey(config);
-  if (!apiKey) return ok();
-
-  const stored = await distillAndStore(bufferToTranscript(session.buffer), {
-    apiKey,
-    projectTag: getProjectTag(workspaceRoot, config),
-    userTag: getUserTag(config),
-  });
-  if (stored) {
-    session.buffer = [];
+  if (await flushSessionBuffer(session, auth)) {
     saveSession(session);
   }
 
-  return ok();
+  return hookOk();
 }
 
-main().catch((err) => {
-  console.error("[supermemory] pre-compact error:", err);
-  ok();
-});
+runHookSafe("pre-compact", main);

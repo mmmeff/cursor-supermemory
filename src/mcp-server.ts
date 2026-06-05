@@ -1,32 +1,26 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { loadConfig, getApiKey, writeConfig, getProjectConfigPath, GLOBAL_CONFIG_PATH } from "./config.ts";
-import { getUserTag, getProjectTag } from "./tags.ts";
+import { loadConfig, getProjectConfigPath, GLOBAL_CONFIG_PATH, writeConfig, type ConfigUpdates } from "./config.ts";
+import { resolveAuth, resolveContainerTag, type AuthContext } from "./authContext.ts";
 import { createClient } from "./client.ts";
+import { memoryBody } from "./memoryText.ts";
 
-function getAuth() {
-  const config = loadConfig();
-  const apiKey = getApiKey(config);
-  if (!apiKey) throw new Error("Not authenticated. Run `cursor-supermemory login` to connect.");
-  return {
-    apiKey,
-    userTag: getUserTag(config),
-    projectTag: getProjectTag(process.cwd(), config),
-  };
-}
-
-// "user" → personal tag, "project" → project tag, anything else → used as-is
-function resolveContainer(auth: { userTag: string; projectTag: string }, container?: string): string {
-  if (!container || container === "user") return auth.userTag;
-  if (container === "project") return auth.projectTag;
-  return container;
+function requireAuth(): AuthContext {
+  const auth = resolveAuth();
+  if (!auth) throw new Error("Not authenticated. Run `cursor-supermemory login` to connect.");
+  return auth;
 }
 
 const containerSchema = z
   .string()
   .optional()
   .describe('Container to use: "user" (default), "project" (current project), or any custom tag string');
+
+function textResult(data: unknown) {
+  const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  return { content: [{ type: "text" as const, text }] };
+}
 
 export async function startMcpServer() {
   const server = new McpServer({ name: "supermemory", version: "1.0.0" });
@@ -41,36 +35,25 @@ export async function startMcpServer() {
     async () => {
       const cwd = process.cwd();
       const config = loadConfig(cwd);
-      const auth = getAuth();
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              {
-                effectiveConfig: {
-                  userContainerTag: config.userContainerTag ?? "(auto-derived from git email / machine id)",
-                  projectContainerTag: config.projectContainerTag ?? "(auto-derived from git root / cwd)",
-                  similarityThreshold: config.similarityThreshold,
-                  maxMemories: config.maxMemories,
-                  maxProjectMemories: config.maxProjectMemories,
-                  injectProfile: config.injectProfile,
-                },
-                resolvedTags: {
-                  user: auth.userTag,
-                  project: auth.projectTag,
-                },
-                configFiles: {
-                  project: getProjectConfigPath(cwd),
-                  global: GLOBAL_CONFIG_PATH,
-                },
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
+      const auth = requireAuth();
+      return textResult({
+        effectiveConfig: {
+          userContainerTag: config.userContainerTag ?? "(auto-derived from git email / machine id)",
+          projectContainerTag: config.projectContainerTag ?? "(auto-derived from git root / cwd)",
+          similarityThreshold: config.similarityThreshold,
+          maxMemories: config.maxMemories,
+          maxProjectMemories: config.maxProjectMemories,
+          injectProfile: config.injectProfile,
+        },
+        resolvedTags: {
+          user: auth.userTag,
+          project: auth.projectTag,
+        },
+        configFiles: {
+          project: getProjectConfigPath(cwd),
+          global: GLOBAL_CONFIG_PATH,
+        },
+      });
     },
   );
 
@@ -90,14 +73,14 @@ export async function startMcpServer() {
       },
     },
     async ({ scope, ...updates }) => {
-      const filtered = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
+      const filtered = Object.fromEntries(
+        Object.entries(updates).filter(([, v]) => v !== undefined),
+      ) as ConfigUpdates;
       if (Object.keys(filtered).length === 0) throw new Error("No config values provided.");
-      writeConfig(filtered as any, scope);
+      writeConfig(filtered, scope);
       const cwd = process.cwd();
       const filePath = scope === "project" ? getProjectConfigPath(cwd) : GLOBAL_CONFIG_PATH;
-      return {
-        content: [{ type: "text", text: `Config updated (${scope}): ${filePath}\n${JSON.stringify(filtered, null, 2)}` }],
-      };
+      return textResult(`Config updated (${scope}): ${filePath}\n${JSON.stringify(filtered, null, 2)}`);
     },
   );
 
@@ -110,22 +93,11 @@ export async function startMcpServer() {
       inputSchema: {},
     },
     async () => {
-      const auth = getAuth();
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              {
-                user: { alias: "user", tag: auth.userTag, description: "Personal memories across all projects" },
-                project: { alias: "project", tag: auth.projectTag, description: "Memories scoped to this workspace" },
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
+      const auth = requireAuth();
+      return textResult({
+        user: { alias: "user", tag: auth.userTag, description: "Personal memories across all projects" },
+        project: { alias: "project", tag: auth.projectTag, description: "Memories scoped to this workspace" },
+      });
     },
   );
 
@@ -137,17 +109,16 @@ export async function startMcpServer() {
       inputSchema: { query: z.string(), container: containerSchema, limit: z.number().default(10) },
     },
     async ({ query, container, limit }) => {
-      const auth = getAuth();
-      const tag = resolveContainer(auth, container);
+      const auth = requireAuth();
+      const tag = resolveContainerTag(auth, container);
       const client = createClient(auth.apiKey, tag);
       const result = await client.search.memories({ q: query, containerTag: tag, limit });
-      const formatted = result.results.map((r) => ({
+      return textResult(result.results.map((r) => ({
         id: r.id,
-        memory: r.memory ?? r.chunk ?? "",
+        memory: memoryBody(r),
         similarity: r.similarity,
         updatedAt: r.updatedAt,
-      }));
-      return { content: [{ type: "text", text: JSON.stringify(formatted, null, 2) }] };
+      })));
     },
   );
 
@@ -159,11 +130,10 @@ export async function startMcpServer() {
       inputSchema: { content: z.string(), container: containerSchema },
     },
     async ({ content, container }) => {
-      const auth = getAuth();
-      const tag = resolveContainer(auth, container);
-      const client = createClient(auth.apiKey, tag);
-      const result = await client.add({ content, containerTag: tag });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      const auth = requireAuth();
+      const tag = resolveContainerTag(auth, container);
+      const result = await createClient(auth.apiKey, tag).add({ content, containerTag: tag });
+      return textResult(result);
     },
   );
 
@@ -174,10 +144,9 @@ export async function startMcpServer() {
       inputSchema: { query: z.string().optional() },
     },
     async ({ query }) => {
-      const auth = getAuth();
-      const client = createClient(auth.apiKey, auth.userTag);
-      const result = await client.profile({ containerTag: auth.userTag, q: query });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      const auth = requireAuth();
+      const result = await createClient(auth.apiKey, auth.userTag).profile({ containerTag: auth.userTag, q: query });
+      return textResult(result);
     },
   );
 
@@ -188,11 +157,10 @@ export async function startMcpServer() {
       inputSchema: { limit: z.number().default(20), page: z.number().default(1), container: containerSchema },
     },
     async ({ limit, page, container }) => {
-      const auth = getAuth();
-      const tag = resolveContainer(auth, container);
-      const client = createClient(auth.apiKey, tag);
-      const result = await client.documents.list({ limit, page });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      const auth = requireAuth();
+      const tag = resolveContainerTag(auth, container);
+      const result = await createClient(auth.apiKey, tag).documents.list({ limit, page });
+      return textResult(result);
     },
   );
 
@@ -208,11 +176,10 @@ export async function startMcpServer() {
     },
     async ({ id, content, container }) => {
       if (!id && !content) throw new Error("Provide either id or content.");
-      const auth = getAuth();
-      const tag = resolveContainer(auth, container);
-      const client = createClient(auth.apiKey, tag);
-      const result = await client.memories.forget({ containerTag: tag, id, content });
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      const auth = requireAuth();
+      const tag = resolveContainerTag(auth, container);
+      const result = await createClient(auth.apiKey, tag).memories.forget({ containerTag: tag, id, content });
+      return textResult(result);
     },
   );
 

@@ -2,13 +2,12 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   rmSync,
-  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readJsonFile, writeJsonFile } from "./jsonFile.ts";
 
 export const PLUGIN_ID = "cursor-supermemory";
 export const PLUGIN_INSTALL_DIR = join(homedir(), ".cursor", "plugins", "local", PLUGIN_ID);
@@ -42,16 +41,6 @@ export function isPluginInstalled(): boolean {
   return existsSync(join(PLUGIN_INSTALL_DIR, "dist", "cli.js"));
 }
 
-function readJson<T>(path: string): T | null {
-  if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, "utf-8")) as T;
-}
-
-function writeJson(path: string, data: unknown): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
-}
-
 export function isSupermemoryHook(command: string): boolean {
   return command.includes(HOOK_MARKER);
 }
@@ -65,7 +54,9 @@ function loadTemplateHooks(packageRoot: string): HooksFile {
   if (!existsSync(path)) {
     throw new Error(`Missing hooks template at ${path}`);
   }
-  return readJson<HooksFile>(path)!;
+  const hooks = readJsonFile<HooksFile>(path);
+  if (!hooks) throw new Error(`Missing hooks template at ${path}`);
+  return hooks;
 }
 
 export function mergeHooks(existing: HooksFile | null, template: HooksFile, pluginDir: string): HooksFile {
@@ -138,14 +129,16 @@ function copyPluginAssets(packageRoot: string): void {
   cpSync(distSrc, join(PLUGIN_INSTALL_DIR, "dist"), { recursive: true });
 
   const mcpConfig: McpFile = { mcpServers: buildMcpEntry(PLUGIN_INSTALL_DIR) };
-  writeJson(join(PLUGIN_INSTALL_DIR, ".mcp.json"), mcpConfig);
+  writeJsonFile(join(PLUGIN_INSTALL_DIR, ".mcp.json"), mcpConfig);
 
   const pluginManifestPath = join(PLUGIN_INSTALL_DIR, ".cursor-plugin", "plugin.json");
   if (existsSync(pluginManifestPath)) {
-    const manifest = readJson<Record<string, unknown>>(pluginManifestPath)!;
-    manifest.mcpServers = ".mcp.json";
-    manifest.hooks = "hooks";
-    writeJson(pluginManifestPath, manifest);
+    const manifest = readJsonFile<Record<string, unknown>>(pluginManifestPath);
+    if (manifest) {
+      manifest.mcpServers = ".mcp.json";
+      manifest.hooks = "hooks";
+      writeJsonFile(pluginManifestPath, manifest);
+    }
   }
 }
 
@@ -157,11 +150,11 @@ export function installPlugin(): InstallResult {
     copyPluginAssets(packageRoot);
 
     const templateHooks = loadTemplateHooks(packageRoot);
-    const userHooks = readJson<HooksFile>(CURSOR_HOOKS_PATH);
-    writeJson(CURSOR_HOOKS_PATH, mergeHooks(userHooks, templateHooks, PLUGIN_INSTALL_DIR));
+    const userHooks = readJsonFile<HooksFile>(CURSOR_HOOKS_PATH);
+    writeJsonFile(CURSOR_HOOKS_PATH, mergeHooks(userHooks, templateHooks, PLUGIN_INSTALL_DIR));
 
-    const userMcp = readJson<McpFile>(CURSOR_MCP_PATH);
-    writeJson(CURSOR_MCP_PATH, mergeMcp(userMcp, PLUGIN_INSTALL_DIR));
+    const userMcp = readJsonFile<McpFile>(CURSOR_MCP_PATH);
+    writeJsonFile(CURSOR_MCP_PATH, mergeMcp(userMcp, PLUGIN_INSTALL_DIR));
 
     return {
       ok: true,
@@ -181,15 +174,15 @@ export function installPlugin(): InstallResult {
 export function uninstallPlugin(): InstallResult {
   try {
     if (existsSync(CURSOR_HOOKS_PATH)) {
-      const hooks = readJson<HooksFile>(CURSOR_HOOKS_PATH);
-      if (hooks) writeJson(CURSOR_HOOKS_PATH, stripSupermemoryHooks(hooks));
+      const hooks = readJsonFile<HooksFile>(CURSOR_HOOKS_PATH);
+      if (hooks) writeJsonFile(CURSOR_HOOKS_PATH, stripSupermemoryHooks(hooks));
     }
 
     if (existsSync(CURSOR_MCP_PATH)) {
-      const mcp = readJson<McpFile>(CURSOR_MCP_PATH);
+      const mcp = readJsonFile<McpFile>(CURSOR_MCP_PATH);
       if (mcp) {
         const stripped = stripSupermemoryMcp(mcp);
-        if (stripped) writeJson(CURSOR_MCP_PATH, stripped);
+        if (stripped) writeJsonFile(CURSOR_MCP_PATH, stripped);
         else rmSync(CURSOR_MCP_PATH);
       }
     }

@@ -1,3 +1,5 @@
+import { memoryBody, type MemoryDocument } from "./memoryText.ts";
+
 const MAX_LENGTH = 2000;
 
 function formatRelativeTime(dateStr: string): string {
@@ -13,10 +15,30 @@ function formatRelativeTime(dateStr: string): string {
   return `${Math.floor(weeks)}w ago`;
 }
 
-export function formatContext(profile: any, memories: any[]): string {
+export interface ProfileSummary {
+  static?: string[];
+  dynamic?: string[];
+}
+
+export function coerceProfile(value: unknown): ProfileSummary | null {
+  if (!value || typeof value !== "object") return null;
+
+  const profile: ProfileSummary = {};
+  if ("static" in value && Array.isArray(value.static)) {
+    profile.static = value.static.filter((item): item is string => typeof item === "string");
+  }
+  if ("dynamic" in value && Array.isArray(value.dynamic)) {
+    profile.dynamic = value.dynamic.filter((item): item is string => typeof item === "string");
+  }
+
+  if (!profile.static?.length && !profile.dynamic?.length) return null;
+  return profile;
+}
+
+export function formatContext(profile: ProfileSummary | null, memories: MemoryDocument[]): string {
   const profileItems: string[] = profile?.static ?? profile?.dynamic ?? [];
   const hasProfile = profileItems.length > 0;
-  const hasMemories = memories?.length > 0;
+  const hasMemories = memories.length > 0;
 
   if (!hasProfile && !hasMemories) return "";
 
@@ -25,16 +47,16 @@ export function formatContext(profile: any, memories: any[]): string {
   if (hasProfile) {
     sections.push(
       "\nUser Profile:",
-      ...profileItems.map((item: string) => `- ${item}`),
+      ...profileItems.map((item) => `- ${item}`),
     );
   }
 
   if (hasMemories) {
     sections.push(
       "\nProject Knowledge:",
-      ...memories.map((m: any) => {
+      ...memories.map((m) => {
         const time = m.updatedAt ? `[${formatRelativeTime(m.updatedAt)}] ` : "";
-        const body = m.memory ?? m.content ?? m.summary ?? "";
+        const body = memoryBody(m);
         const label = m.title ? `${m.title}: ` : "";
         return `- ${time}${label}${body}`;
       }),

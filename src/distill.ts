@@ -1,4 +1,5 @@
 import { runAgentCompletion, DEFAULT_DISTILL_MODEL } from "./agentCli.ts";
+import { createClient } from "./client.ts";
 
 export interface DistilledNotes {
   projectNotes: string[];
@@ -7,18 +8,12 @@ export interface DistilledNotes {
 
 export interface DistillOptions {
   model?: string;
-  // Approximate max characters of transcript to put in a single window. Sized
-  // well under composer-2.5's context so the prompt + instructions also fit.
   windowChars?: number;
-  // Characters of overlap between adjacent windows so insights spanning a
-  // boundary aren't lost.
   overlapChars?: number;
 }
 
 const DEFAULTS = {
   model: DEFAULT_DISTILL_MODEL,
-  // ~4 chars/token. 48k tokens of transcript ≈ 190k chars, comfortably inside
-  // composer-2.5 while leaving room for the instruction prompt and output.
   windowChars: 190_000,
   overlapChars: 8_000,
 } satisfies Required<DistillOptions>;
@@ -81,8 +76,7 @@ function buildMergePrompt(notes: DistilledNotes): string {
   ].join("\n");
 }
 
-// Split a long transcript into overlapping windows on line boundaries.
-function chunkTranscript(transcript: string, windowChars: number, overlapChars: number): string[] {
+export function chunkTranscript(transcript: string, windowChars: number, overlapChars: number): string[] {
   if (transcript.length <= windowChars) return [transcript];
 
   const chunks: string[] = [];
@@ -95,7 +89,7 @@ function chunkTranscript(transcript: string, windowChars: number, overlapChars: 
   return chunks;
 }
 
-function parseSections(text: string): { projectNotes: string[]; userNotes: string[] } {
+export function parseSections(text: string): { projectNotes: string[]; userNotes: string[] } {
   const projectNotes: string[] = [];
   const userNotes: string[] = [];
   let current: "project" | "user" | null = null;
@@ -112,8 +106,6 @@ function parseSections(text: string): { projectNotes: string[]; userNotes: strin
       continue;
     }
 
-    // Strip the bullet prefix BEFORE checking sentinels — the model often emits
-    // the empty marker as a bullet ("- NONE"), which must not become a note.
     const bullet = line.replace(/^[-*•]\s*/, "").trim();
     if (!bullet) continue;
     if (bullet.toUpperCase() === NONE) continue;
@@ -124,7 +116,7 @@ function parseSections(text: string): { projectNotes: string[]; userNotes: strin
   return { projectNotes, userNotes };
 }
 
-function dedupe(notes: string[]): string[] {
+export function dedupe(notes: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const note of notes) {
@@ -137,14 +129,10 @@ function dedupe(notes: string[]): string[] {
   return out;
 }
 
-/**
- * Distill a session transcript into condensed project- and user-scoped notes
- * using the local Cursor Agent CLI. Long transcripts are scanned with
- * overlapping windows and the per-window results merged.
- *
- * Returns null if inference is unavailable (CLI missing / not authenticated) or
- * produced nothing usable — callers should skip persistence in that case.
- */
+export function writesSucceeded(results: PromiseSettledResult<unknown>[]): boolean {
+  return results.length > 0 && results.every((r) => r.status === "fulfilled");
+}
+
 export async function distillTranscript(
   transcript: string,
   options: DistillOptions = {},
@@ -163,7 +151,6 @@ export async function distillTranscript(
     );
     const raw = await runAgentCompletion(prompt, model);
     if (raw === null) {
-      // CLI unavailable: bail entirely so we don't persist a partial result.
       if (i === 0) return null;
       continue;
     }
@@ -178,8 +165,6 @@ export async function distillTranscript(
   collected.projectNotes = dedupe(collected.projectNotes);
   collected.userNotes = dedupe(collected.userNotes);
 
-  // With multiple windows, overlap produces duplicate/fragmented notes — run a
-  // final consolidation pass to merge them into a clean set.
   if (chunks.length > 1 && (collected.projectNotes.length || collected.userNotes.length)) {
     const merged = await runAgentCompletion(buildMergePrompt(collected), model);
     if (merged !== null) {
@@ -197,20 +182,11 @@ export async function distillTranscript(
   return collected;
 }
 
-// Render a note list into a single document for storage in a container.
 export function formatNotesForStorage(notes: string[], scope: "project" | "user"): string {
   const heading = scope === "project" ? "Project learnings" : "User learnings";
   return `${heading} (distilled from a Cursor session):\n${notes.map((n) => `- ${n}`).join("\n")}`;
 }
 
-import { createClient } from "./client.ts";
-
-/**
- * Distill a transcript string and persist the resulting notes to the
- * project/user containers. Shared by the stop / preCompact / sessionEnd hooks
- * for incremental capture. No-op (returns false) if there's nothing to capture
- * or inference is unavailable; never stores raw transcripts.
- */
 export async function distillAndStore(
   transcript: string,
   opts: { apiKey: string; projectTag: string; userTag: string },
@@ -238,6 +214,7 @@ export async function distillAndStore(
     );
   }
   if (!writes.length) return false;
-  await Promise.allSettled(writes);
-  return true;
+
+  const results = await Promise.allSettled(writes);
+  return writesSucceeded(results);
 }

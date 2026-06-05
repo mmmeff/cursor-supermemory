@@ -1,26 +1,18 @@
 import { claimPendingRecall } from "../sessionStore.ts";
-import { readStdinText } from "../stdin.ts";
+import { hookOk, readHookInput, runHookSafe } from "../hookRuntime.ts";
 
 interface PostToolUseInput {
   conversation_id?: string;
 }
 
-const ok = () => process.stdout.write(JSON.stringify({ continue: true }));
-
-// postToolUse is the only per-turn hook that can inject context
-// (additional_context). We use it to deliver the recall that
-// beforeSubmitPrompt stashed, exactly once per turn (cleared on inject).
 async function main() {
-  const raw = await readStdinText();
-  const input: PostToolUseInput = JSON.parse(raw);
+  const input = await readHookInput<PostToolUseInput>();
 
   const conversationId = input.conversation_id ?? "";
-  if (!conversationId) return ok();
+  if (!conversationId) return hookOk();
 
-  // Atomic claim: only one concurrent tool-call process wins, so recall is
-  // injected exactly once per turn even under parallel tool calls.
   const recall = claimPendingRecall(conversationId);
-  if (!recall) return ok();
+  if (!recall) return hookOk();
 
   process.stdout.write(JSON.stringify({
     continue: true,
@@ -31,7 +23,4 @@ async function main() {
   }));
 }
 
-main().catch((err) => {
-  console.error("[supermemory] post-tool-use error:", err);
-  ok();
-});
+runHookSafe("post-tool-use", main);

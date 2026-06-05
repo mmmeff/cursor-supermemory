@@ -120,9 +120,9 @@ Per-workspace overrides. Add to `.gitignore` if it contains an API key. Project 
 | `apiKey` | Project-specific API key | — |
 | `userContainerTag` | Override personal memory container | auto-derived from git email / machine id |
 | `projectContainerTag` | Override project memory container. Commit this when your team should share one project memory bucket. | auto-derived from git root / cwd |
-| `similarityThreshold` | Minimum similarity score for search results | `0.3` |
-| `maxMemories` | Max project memories injected at session start | `10` |
-| `maxProjectMemories` | Max project memories injected at session start | `5` |
+| `similarityThreshold` | Minimum similarity score for per-turn recall search results | `0.3` |
+| `maxMemories` | Max memories returned for per-turn recall (`beforeSubmitPrompt`) | `10` |
+| `maxProjectMemories` | Max recent project notes injected at session start | `5` |
 | `injectProfile` | Whether to inject user profile at session start | `true` |
 
 You can set these via the AI using `supermemory_set_config`, or create/edit the file manually.
@@ -141,6 +141,8 @@ To share project memory with your team, commit the same `projectContainerTag` in
 ```bash
 npm install
 npm run build   # compiles all dist/ files
+npm test        # unit tests
+npm run smoke   # verify bundled hooks have no external imports
 ```
 
 ### Testing locally (without the marketplace)
