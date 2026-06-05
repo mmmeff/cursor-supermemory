@@ -20,7 +20,6 @@ await Promise.all(
       platform: "node",
       format: "esm",
       target: "node20",
-      packages: "external",
     }),
   ),
 );
